@@ -49,6 +49,7 @@ avg_rk = mesh.meta.declare_scalar_field("avg_res_adequacy_parameter")
 res_adeq = mesh.meta.declare_scalar_field("resolution_adequacy_parameter")
 k_ratio = mesh.meta.declare_scalar_field("k_ratio")
 avg_tke_res = mesh.meta.declare_scalar_field("average_tke_resolved")
+min_dist = mesh.meta.declare_scalar_field("minimum_distance_to_wall")
 
 # Register the fields on desired parts
 velocity.add_to_part(
@@ -68,6 +69,7 @@ avg_rk.add_to_part(mesh.meta.universal_part, init_value=np.array([0.0]))
 res_adeq.add_to_part(mesh.meta.universal_part, init_value=np.array([0.0]))
 k_ratio.add_to_part(mesh.meta.universal_part, init_value=np.array([0.0]))
 avg_tke_res.add_to_part(mesh.meta.universal_part, init_value=np.array([0.0]))
+min_dist.add_to_part(mesh.meta.universal_part, init_value=np.array([0.0]))
 
 # Commit the metadata and load the mesh. Also create edges at this point (default is False)
 mesh.populate_bulk_data(create_edges=True)
@@ -91,6 +93,7 @@ print(f"Fluid_part has elems: {not sel.is_empty(StkRank.ELEM_RANK)}")
 
 # Update fields
 buf = 0.2
+ndtw = mesh.meta.get_field_by_name("ndtw")
 for k, bkt in enumerate(mesh.iter_buckets(sel, StkRank.NODE_RANK)):
 
     xyz = coords.bkt_view(bkt)
@@ -108,6 +111,9 @@ for k, bkt in enumerate(mesh.iter_buckets(sel, StkRank.NODE_RANK)):
     ]
     idx = xyz_cdp.index
     tri = qhull.Delaunay(xyz_cdp)
+
+    md = min_dist.bkt_view(bkt)
+    md[:] = ndtw.bkt_view(bkt)
 
     fields = {
         "ux": {"arr": velocity.bkt_view(bkt), "comp": 0},
@@ -146,7 +152,7 @@ for fld in [
     "resolution_adequacy_parameter",
     "k_ratio",
     "average_tke_resolved",
-    "ndtw",
+    "minimum_distance_to_wall",
 ]:
     f = mesh.meta.get_field_by_name(fld)
     stkio.add_field(fh, f)
