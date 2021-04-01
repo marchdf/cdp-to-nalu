@@ -40,16 +40,19 @@ mesh.read_mesh_meta_data(
 )
 
 # Register fields
-velocity = mesh.meta.declare_vector_field("velocity", number_of_states=3)
-avg_velocity = mesh.meta.declare_vector_field("average_velocity", number_of_states=3)
+velocity = mesh.meta.declare_vector_field("velocity")
+avg_velocity = mesh.meta.declare_vector_field("average_velocity")
 turb_ke = mesh.meta.declare_scalar_field("turbulent_ke")
-turb_visc = mesh.meta.declare_scalar_field("turbulent_viscosity")
+sdr = mesh.meta.declare_scalar_field("specific_dissipation_rate")
+# turb_visc = mesh.meta.declare_scalar_field("turbulent_viscosity")
 avg_prod = mesh.meta.declare_scalar_field("average_production")
 avg_rk = mesh.meta.declare_scalar_field("avg_res_adequacy_parameter")
-res_adeq = mesh.meta.declare_scalar_field("resolution_adequacy_parameter")
+# res_adeq = mesh.meta.declare_scalar_field("resolution_adequacy_parameter")
 k_ratio = mesh.meta.declare_scalar_field("k_ratio")
 avg_tke_res = mesh.meta.declare_scalar_field("average_tke_resolved")
 min_dist = mesh.meta.declare_scalar_field("minimum_distance_to_wall")
+press = mesh.meta.declare_scalar_field("pressure")
+avg_dudx = mesh.meta.declare_generic_field("average_dudx")
 
 # Register the fields on desired parts
 velocity.add_to_part(
@@ -63,13 +66,20 @@ avg_velocity.add_to_part(
     init_value=np.array([10.0, 0.0, 0.0]),
 )
 turb_ke.add_to_part(mesh.meta.universal_part, init_value=np.array([0.0]))
-turb_visc.add_to_part(mesh.meta.universal_part, init_value=np.array([0.0]))
+sdr.add_to_part(mesh.meta.universal_part, init_value=np.array([0.0]))
+# turb_visc.add_to_part(mesh.meta.universal_part, init_value=np.array([0.0]))
 avg_prod.add_to_part(mesh.meta.universal_part, init_value=np.array([0.0]))
 avg_rk.add_to_part(mesh.meta.universal_part, init_value=np.array([0.0]))
-res_adeq.add_to_part(mesh.meta.universal_part, init_value=np.array([0.0]))
+# res_adeq.add_to_part(mesh.meta.universal_part, init_value=np.array([0.0]))
 k_ratio.add_to_part(mesh.meta.universal_part, init_value=np.array([0.0]))
 avg_tke_res.add_to_part(mesh.meta.universal_part, init_value=np.array([0.0]))
 min_dist.add_to_part(mesh.meta.universal_part, init_value=np.array([0.0]))
+avg_dudx.add_to_part(
+    mesh.meta.universal_part,
+    mesh.meta.spatial_dimension * mesh.meta.spatial_dimension,
+    init_value=np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+)
+press.add_to_part(mesh.meta.universal_part, init_value=np.array([0.0]))
 
 # Commit the metadata and load the mesh. Also create edges at this point (default is False)
 mesh.populate_bulk_data(create_edges=True)
@@ -123,12 +133,23 @@ for k, bkt in enumerate(mesh.iter_buckets(sel, StkRank.NODE_RANK)):
         "avgUy": {"arr": avg_velocity.bkt_view(bkt), "comp": 1},
         "avgUz": {"arr": avg_velocity.bkt_view(bkt), "comp": 2},
         "tke": {"arr": turb_ke.bkt_view(bkt)},
-        "tvisc": {"arr": turb_visc.bkt_view(bkt)},
+        "tdr": {"arr": sdr.bkt_view(bkt)},
+        # "tvisc": {"arr": turb_visc.bkt_view(bkt)},
         "avgProd": {"arr": avg_prod.bkt_view(bkt)},
         "avgRk": {"arr": avg_rk.bkt_view(bkt)},
-        "rk": {"arr": res_adeq.bkt_view(bkt)},
+        # "rk": {"arr": res_adeq.bkt_view(bkt)},
         "alpha": {"arr": k_ratio.bkt_view(bkt)},
         "kres": {"arr": avg_tke_res.bkt_view(bkt)},
+        "press": {"arr": press.bkt_view(bkt)},
+        "avgDudx11": {"arr": avg_dudx.bkt_view(bkt), "comp": 0},
+        "avgDudx12": {"arr": avg_dudx.bkt_view(bkt), "comp": 1},
+        "avgDudx13": {"arr": avg_dudx.bkt_view(bkt), "comp": 2},
+        "avgDudx21": {"arr": avg_dudx.bkt_view(bkt), "comp": 3},
+        "avgDudx22": {"arr": avg_dudx.bkt_view(bkt), "comp": 4},
+        "avgDudx23": {"arr": avg_dudx.bkt_view(bkt), "comp": 5},
+        "avgDudx31": {"arr": avg_dudx.bkt_view(bkt), "comp": 6},
+        "avgDudx32": {"arr": avg_dudx.bkt_view(bkt), "comp": 7},
+        "avgDudx33": {"arr": avg_dudx.bkt_view(bkt), "comp": 8},
     }
     lcdp = cdp.loc[idx]
     for i, (key, value) in enumerate(fields.items()):
@@ -146,13 +167,16 @@ for fld in [
     "velocity",
     "average_velocity",
     "turbulent_ke",
-    "turbulent_viscosity",
+    "specific_dissipation_rate"
+    # "turbulent_viscosity",
     "average_production",
     "avg_res_adequacy_parameter",
     "resolution_adequacy_parameter",
     "k_ratio",
     "average_tke_resolved",
     "minimum_distance_to_wall",
+    "pressure",
+    "average_dudx",
 ]:
     f = mesh.meta.get_field_by_name(fld)
     stkio.add_field(fh, f)
